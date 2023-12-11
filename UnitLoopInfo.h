@@ -5,7 +5,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <queue>
-#include <stack>
 
 using namespace llvm;
 
@@ -17,9 +16,6 @@ struct LoopMeta;
 class UnitLoopInfo {
 
   // Define this class to provide the information you need in LICM
-  // std::vector<BasicBlock*> Entries;
-  // std::vector<BasicBlock*> Exits;
-  // std::vector<BasicBlock*> Blocks;
 public:
   // Mapping from loop headers to their relevant loop information
   std::unordered_map<BasicBlock*, LoopMeta*> m_HeaderLoopMeta;
@@ -30,10 +26,13 @@ public:
 
 // An object holding the metadata of a natural loop, only attached to loop headers
 struct LoopMeta {
-  LoopMeta() : m_ParentLoopHeader(nullptr) {}
+  LoopMeta(BasicBlock* loop_header) : m_LoopHeader(loop_header) {}
 
-  // The outer layer loop header. nullptr if top-level loop
-  BasicBlock* m_ParentLoopHeader;
+  // Current Loop Header where this LoopMeta is attached to
+  BasicBlock* m_LoopHeader;
+
+  // The outer layer loop header, identified by sources of back edges
+  std::unordered_map<BasicBlock*, BasicBlock*> m_ParentLoopHeader;
 
   // Loop members identified by different back edge source blocks
   std::unordered_map<BasicBlock*, std::vector<BasicBlock*>> m_LoopMemberBlocks;

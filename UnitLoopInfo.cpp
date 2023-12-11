@@ -57,6 +57,45 @@ void GetNaturalLoop(BasicBlock* loop_header, BasicBlock* end, DominatorTree& DT,
   }
 }
 
+// Helper method on deciding whether set B is a subset of set A
+bool SetAContainsSetB(std::unordered_set<BasicBlock*> A, std::unordered_set<BasicBlock*> B) {
+  if (A.size() < B.size()) 
+    return false;
+  for (BasicBlock* b : B) {
+    if (!A.count(b)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Helper 
+// Assumes that the natural loop formed by end->outer_loop_header is already properly set in Loops
+void SetupInnerLoops(BasicBlock* outer_loop_header, BasicBlock* end, UnitLoopInfo& Loops) {
+  assert(Loops.m_HeaderLoopMeta.count(outer_loop_header));
+  std::vector<BasicBlock*>& loop_member = Loops.m_HeaderLoopMeta[outer_loop_header]->m_LoopMemberBlocks[end];
+  std::unordered_set<BasicBlock*> member_set(loop_member.begin(), loop_member.end());
+
+  for (auto it = loop_member.rbegin(); it!=loop_member.rend(); it++) {
+    BasicBlock* member = *it;
+    // Only consider whether or not inner loop if this member is a loop header
+    if (Loops.m_HeaderLoopMeta.count(member)) {
+      LoopMeta* member_loop_header_meta = Loops.m_HeaderLoopMeta[member];
+      for (auto& [member_back_src, member_loop_members] : member_loop_header_meta->m_LoopMemberBlocks) {
+        // Only consider top-level loops when deciding whether or not inner
+        if (member_loop_header_meta->m_ParentLoopHeader.count(member_back_src)) {
+          continue;
+        }
+        std::unordered_set<BasicBlock*> member_loop_members_set(member_loop_members.begin(), member_loop_members.end());
+        // If all members of the member loop are also members of the outer loop, then it is a innerloop
+        if (SetAContainsSetB(member_set, member_loop_members_set)) {
+          member_loop_header_meta->m_ParentLoopHeader[member_back_src] = outer_loop_header;
+        }
+      }
+    }
+  }
+}
+
 /// Main function for running the Loop Identification analysis. This function
 /// returns information about the loops in the function via the UnitLoopInfo
 /// object
@@ -80,25 +119,17 @@ UnitLoopInfo UnitLoopAnalysis::run(Function &F, FunctionAnalysisManager &FAM) {
     }
     // If current block dominates some blocks that point to itself, then it is a loop header
     if (back_edges_srcs.size()) {
+      LoopMeta* loop_metadata = new LoopMeta(BB);
+      Loops.m_HeaderLoopMeta[BB] = loop_metadata;
       // Set metadata information about the loop for every loop header
       for (BasicBlock* back_src : back_edges_srcs) {
-        if (!Loops.m_HeaderLoopMeta.count(BB)) {
-          LoopMeta* loop_metadata = new LoopMeta();
-        }
-        LoopMeta* loop_metadata = Loops.m_HeaderLoopMeta[BB];
         // Get all loop members corresponding to this back edge
         std::vector<BasicBlock*> natural_loop_members;
         GetNaturalLoop(BB, back_src, DT, natural_loop_members);
         loop_metadata->m_LoopMemberBlocks[back_src] = natural_loop_members;
 
-        if (!Loops.m_InnerMostLoopHeader.count(back_src)) {
-          Loops.m_InnerMostLoopHeader[back_src] = BB;
-        } else {
-          // If this src already binds to a loop header, then modify the loopMeta of that loopheader to have this one as the parent
-          BasicBlock* inner_loop_header = Loops.m_InnerMostLoopHeader[back_src];
-          LoopMeta* inner_loop_meta = Loops.m_HeaderLoopMeta[inner_loop_header];
-          inner_loop_meta->m_ParentLoopHeader = BB;
-        }
+        // Identify inner loops and setup nested relationships
+        SetupInnerLoops(BB, back_src, Loops);
       }
     }
   }
