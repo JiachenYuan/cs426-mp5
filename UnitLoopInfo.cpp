@@ -134,8 +134,15 @@ UnitLoopInfo UnitLoopAnalysis::run(Function &F, FunctionAnalysisManager &FAM) {
     }
   }
 
+  for (auto& [header_block, loop_info] : Loops.m_HeaderLoopMeta) {
+    dbgs() << "[LoopLoopAnalysis] identifies block starts with: " << header_block->front() \
+    << " and end with: " << header_block->back() << " as a loop header\n";
+  }
+
 
 
 
   return Loops;
 }
+
+AnalysisKey UnitLoopAnalysis::Key;
