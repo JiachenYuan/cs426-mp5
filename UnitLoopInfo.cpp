@@ -18,21 +18,24 @@ void GetNaturalLoop(BasicBlock* loop_header, BasicBlock* end, DominatorTree& DT,
   std::unordered_set<BasicBlock*> header_reacheable_blocks(temp.begin(), temp.end());
   header_reacheable_blocks.erase(loop_header);
 
+  // dbgs() << "GetNaturalLoop for " << loop_header->front() << ", who end in " << end->front() << '\n';
+  // dbgs() << header_reacheable_blocks.size() << '\n';
+
   // BFS to identify blocks that can reach end without going thru loop_header
   std::unordered_set<BasicBlock*> can_reach_end;  
   std::queue<BasicBlock*> work_list;
   work_list.push(end);
-  can_reach_end.insert(end);
   std::unordered_set<BasicBlock*> visited;
 
   while (work_list.size()) {
     BasicBlock* curr = work_list.front();
     work_list.pop();
     visited.insert(curr);
+    can_reach_end.insert(curr);
+    // dbgs() << "Member contains: " << curr->front() << '\n';
 
     for (BasicBlock* pred : predecessors(curr)) {
-      if (!visited.count(curr) && header_reacheable_blocks.count(pred) && pred != loop_header) {
-        can_reach_end.insert(pred);
+      if (!visited.count(pred) && header_reacheable_blocks.count(pred)) {
         work_list.push(pred);
       }
     }
@@ -48,9 +51,10 @@ void GetNaturalLoop(BasicBlock* loop_header, BasicBlock* end, DominatorTree& DT,
     work_list.pop();
     visited.insert(curr);
     natural_loop.push_back(curr);
+    // dbgs() << "> Pushed member " << curr->front() << '\n';
 
     for (BasicBlock* child : successors(curr)) {
-      if (!visited.count(curr) && can_reach_end.count(curr)) {
+      if (!visited.count(child) && can_reach_end.count(child)) {
         work_list.push(child);
       }
     }
@@ -79,7 +83,8 @@ void SetupInnerLoops(BasicBlock* outer_loop_header, BasicBlock* end, UnitLoopInf
   for (auto it = loop_member.rbegin(); it!=loop_member.rend(); it++) {
     BasicBlock* member = *it;
     // Only consider whether or not inner loop if this member is a loop header
-    if (Loops.m_HeaderLoopMeta.count(member)) {
+    if (Loops.m_HeaderLoopMeta.count(member) && member!=outer_loop_header) {
+      // dbgs() << "Outer_loop " << outer_loop_header->front() << "  has member loop header: " << member->front() << '\n';
       LoopMeta* member_loop_header_meta = Loops.m_HeaderLoopMeta[member];
       for (auto& [member_back_src, member_loop_members] : member_loop_header_meta->m_LoopMemberBlocks) {
         // Only consider top-level loops when deciding whether or not inner
@@ -88,6 +93,7 @@ void SetupInnerLoops(BasicBlock* outer_loop_header, BasicBlock* end, UnitLoopInf
         }
         std::unordered_set<BasicBlock*> member_loop_members_set(member_loop_members.begin(), member_loop_members.end());
         // If all members of the member loop are also members of the outer loop, then it is a innerloop
+        // dbgs() << (member_set==member_loop_members_set && member_loop_members_set==member_set) << "\n";
         if (SetAContainsSetB(member_set, member_loop_members_set)) {
           member_loop_header_meta->m_ParentLoopHeader[member_back_src] = outer_loop_header;
         }
@@ -96,10 +102,23 @@ void SetupInnerLoops(BasicBlock* outer_loop_header, BasicBlock* end, UnitLoopInf
   }
 }
 
+void printAllSubLoopLeadersReference(Loop* L) {
+   // Get the loop header
+    BasicBlock *Header = L->getHeader();
+    for (Loop *SubLoop : L->getSubLoops()) {
+      BasicBlock *SubLoopHeader = SubLoop->getHeader();
+      dbgs() << "parent loop header: " << Header->front() << "\n";
+      dbgs() << "It has child loop header: ^-" << SubLoopHeader->front() << "\n";
+      // Recurse
+      printAllSubLoopLeadersReference(SubLoop);
+    }
+}
+
 /// Main function for running the Loop Identification analysis. This function
 /// returns information about the loops in the function via the UnitLoopInfo
 /// object
 UnitLoopInfo UnitLoopAnalysis::run(Function &F, FunctionAnalysisManager &FAM) {
+  dbgs() << "******************************************************\n";
   dbgs() << "UnitLoopAnalysis running on " << F.getName() << "\n";
   // Acquires the Dominator Tree constructed by LLVM for this function. You may
   // find this useful in identifying the natural loops
@@ -134,11 +153,24 @@ UnitLoopInfo UnitLoopAnalysis::run(Function &F, FunctionAnalysisManager &FAM) {
     }
   }
 
+  
   for (auto& [header_block, loop_info] : Loops.m_HeaderLoopMeta) {
-    dbgs() << "[LoopLoopAnalysis] identifies block starts with: " << header_block->front() \
-    << " and end with: " << header_block->back() << " as a loop header\n";
+    for (auto& [back_src, block] : loop_info->m_ParentLoopHeader) {
+      dbgs() << "[LoopLoopAnalysis] parent loop header is: " << block->front() << "\n";
+      dbgs() << "[LoopLoopAnalysis] It has child loop header : ^-" << header_block->front() << "\n";
+    }
   }
 
+  
+  // Run built-in analysis pass and print out debug info
+  LoopInfo &LI = FAM.getResult<LoopAnalysis>(F);
+  dbgs() << "\n *** Built-in LoopInfo analysis *** \n";
+  for (Loop *L : LI) {
+    // Get the loop header
+    BasicBlock *Header = L->getHeader();
+    printAllSubLoopLeadersReference(L);
+  }
+  dbgs() << "******************************************************\n";
 
 
 
