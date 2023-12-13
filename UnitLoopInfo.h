@@ -17,10 +17,11 @@ class UnitLoopInfo {
 
   // Define this class to provide the information you need in LICM
 public:
-  // Mapping from loop headers to their relevant loop information
+  // Mapping from loop headers to their relevant loop information for each 
+  //  corresponding back edge that points to it
   std::unordered_map<BasicBlock*, LoopMeta*> m_HeaderLoopMeta;
 
-  // Innermost loop header (if there is one) for basic blocks
+  // Innermost loop header (if there is one) for basic blocks if it is a member of some natural loops
   std::unordered_map<BasicBlock*, BasicBlock*> m_InnerMostLoopHeader;
 };
 
