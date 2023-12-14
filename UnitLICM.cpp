@@ -101,24 +101,30 @@ PreservedAnalyses UnitLICM::run(Function& F, FunctionAnalysisManager& FAM) {
       // dbgs() << "original predecessor: " << *pred->getTerminator() << '\n';
       original_predecessors.push_back(pred);
     }
-    BasicBlock* preheader = BasicBlock::Create(loop_header->getContext(), "pre_header", loop_header->getParent(), loop_header);
-    for (BasicBlock* pred : original_predecessors) {
-      dbgs() << "after create the entry point: " << *pred->getTerminator() << '\n';
-      Instruction* last_instr = pred->getTerminator();
-      last_instr->replaceSuccessorWith(loop_header, preheader);
-      loop_header->replacePhiUsesWith(pred, preheader);
+    if (original_predecessors.size() == 1) {
+      LoopPreHeaders[loop_header] = original_predecessors[0];
+    } else {
+      BasicBlock* preheader = BasicBlock::Create(loop_header->getContext(), "pre_header", loop_header->getParent(), loop_header);
+      for (BasicBlock* pred : original_predecessors) {
+        dbgs() << "after create the entry point: " << *pred->getTerminator() << '\n';
+        Instruction* last_instr = pred->getTerminator();
+        last_instr->replaceSuccessorWith(loop_header, preheader);
+        loop_header->replacePhiUsesWith(pred, preheader);
+      }
+      BranchInst* branch_instr = BranchInst::Create(loop_header, preheader);
+      LoopPreHeaders[loop_header] = preheader;
+      dbgs() << "Loop preheader for " << loop_header->front() << " added\n";
     }
-    BranchInst* branch_instr = BranchInst::Create(loop_header, preheader);
-    LoopPreHeaders[loop_header] = preheader;
-    dbgs() << "Loop preheader for " << loop_header->front() << " added\n";
   }
 
 
   for (BasicBlock* outermost_loop_header : Loops.m_OuterMostLoopHeaders) {
+      dbgs() << "in for outermost_loop_header\n";
     std::vector<LoopRange> opt_order;
     InnerToOuterLoops(Loops, outermost_loop_header, opt_order);
     dbgs() << "opt_order is of size " << opt_order.size() << '\n';
     for (LoopRange range : opt_order) {
+      dbgs() << "in for opt_order\n";
       // Optimizing for a loop
       std::vector<Instruction*> instr_to_move;
       std::unordered_set<Instruction*> invariant_instrs;
@@ -195,7 +201,11 @@ PreservedAnalyses UnitLICM::run(Function& F, FunctionAnalysisManager& FAM) {
 
 
   // Set proper preserved analyses
+  // PreservedAnalyses PA = PreservedAnalyses::all();
+  // PA.abandon<UnitLoopAnalysis>();
   return PreservedAnalyses::all();
+  // PreservedAnalyses PA;
+  // return PA;
 
   
 }
