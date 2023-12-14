@@ -44,6 +44,9 @@ struct LoopMeta {
 
   // Loop members identified by different back edge source blocks
   std::unordered_map<BasicBlock*, std::vector<BasicBlock*>> m_LoopMemberBlocks;
+
+  // All possible exit blocks of a natural loop identified by a back edge
+  std::unordered_map<BasicBlock*, std::vector<BasicBlock*>> m_LoopExitBlocks;
   
 };
 

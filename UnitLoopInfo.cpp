@@ -156,7 +156,22 @@ UnitLoopInfo UnitLoopAnalysis::run(Function &F, FunctionAnalysisManager &FAM) {
     }
   }
 
-  
+  // Add all exit blocks for each identified loop
+  for (auto& [header_block, loop_info] : Loops.m_HeaderLoopMeta) {
+    for (auto& [back_src, members_of_loop] : loop_info->m_LoopMemberBlocks) {
+      for (BasicBlock* member : members_of_loop) {
+        for (BasicBlock* member_succ : successors(member)) {
+          // If the member block has successor that is not in the loop, then it is a exit block
+          if (std::find(members_of_loop.begin(), members_of_loop.end(), member_succ) == members_of_loop.end()) {
+            Loops.m_HeaderLoopMeta[header_block]->m_LoopExitBlocks[back_src].push_back(member);
+          }
+        }
+      }
+    }
+  }
+
+
+  // Set up the outermost loop vectors  
   for (auto& [header_block, loop_info] : Loops.m_HeaderLoopMeta) {
     // If has not parent loop header, then it is one of the outermost loops
     if (loop_info->m_ParentLoopHeader.size() == 0) {
