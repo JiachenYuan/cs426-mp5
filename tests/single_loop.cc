@@ -1,6 +1,9 @@
 int main() {
-    for (int i=0; i<10; i++) {
-        int a = 1;
-    }
+    int i = 10;
+    while (i >= 0) {
+        int j = 10 + 300-9;
+        int k = j + 833;
+        i--;
+    } 
     return 0;
 }
