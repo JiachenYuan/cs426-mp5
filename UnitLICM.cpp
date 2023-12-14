@@ -20,14 +20,24 @@ STATISTIC(NumComputeHoisted, "Number of computes hoisted");
 
 STATISTIC(Total, "Total number of computes hoisted");
 
-void InnerToOuterLoops(UnitLoopInfo& Loops, BasicBlock* loop_header, std::vector<LoopRange> result) {
+void InnerToOuterLoops(UnitLoopInfo& Loops, BasicBlock* loop_header, std::vector<LoopRange>& result) {
   LoopMeta* loop_info = Loops.m_HeaderLoopMeta[loop_header];
-  for (auto& [back_edge_src, child_ranges] : loop_info->m_ChildrenLoopHeader) {
-    for (auto& [child_head, child_end] : child_ranges) {
-      result.push_back({child_head, child_end});
+  
+  // dbgs() << loop_info->m_ChildrenLoopHeader.size() << '\n';
+
+  for (auto& [back_src, members] : loop_info->m_LoopMemberBlocks) {
+    for (auto& child_ranges : loop_info->m_ChildrenLoopHeader[back_src]) {
+      InnerToOuterLoops(Loops, child_ranges.first, result);
     }
-    result.push_back({loop_header, back_edge_src});
+    result.push_back({loop_header, back_src});
   }
+  // for (auto& [back_edge_src, child_ranges] : loop_info->m_ChildrenLoopHeader) {
+  //   for (auto& [child_head, child_end] : child_ranges) {
+  //     // result.push_back({child_head, child_end});
+  //     InnerToOuterLoops(Loops, child_head, result);
+  //   }
+  //   result.push_back({loop_header, back_edge_src});
+  // }
 }
 
 bool ShouldConsiderInstr(Instruction& I) {
@@ -85,20 +95,29 @@ PreservedAnalyses UnitLICM::run(Function& F, FunctionAnalysisManager& FAM) {
   // For simplicity, just add a preheader for each loop 
   std::unordered_map<BasicBlock*, BasicBlock*> LoopPreHeaders;
   for (auto& [loop_header, loop_info] : Loops.m_HeaderLoopMeta) {
-    BasicBlock* preheader = BasicBlock::Create(loop_header->getContext(), "", loop_header->getParent(), loop_header);
-    BranchInst* branch_instr = BranchInst::Create(loop_header, preheader);
-    for (BasicBlock* pred : predecessors(loop_header)) {
+    // BB creation alters the entry point of the predecessor list of the original loop header, need to precomputed
+    std::vector<BasicBlock*> original_predecessors;
+    for (auto pred : predecessors(loop_header)) {
+      // dbgs() << "original predecessor: " << *pred->getTerminator() << '\n';
+      original_predecessors.push_back(pred);
+    }
+    BasicBlock* preheader = BasicBlock::Create(loop_header->getContext(), "pre_header", loop_header->getParent(), loop_header);
+    for (BasicBlock* pred : original_predecessors) {
+      dbgs() << "after create the entry point: " << *pred->getTerminator() << '\n';
       Instruction* last_instr = pred->getTerminator();
       last_instr->replaceSuccessorWith(loop_header, preheader);
       loop_header->replacePhiUsesWith(pred, preheader);
     }
+    BranchInst* branch_instr = BranchInst::Create(loop_header, preheader);
     LoopPreHeaders[loop_header] = preheader;
+    dbgs() << "Loop preheader for " << loop_header->front() << " added\n";
   }
 
 
   for (BasicBlock* outermost_loop_header : Loops.m_OuterMostLoopHeaders) {
     std::vector<LoopRange> opt_order;
     InnerToOuterLoops(Loops, outermost_loop_header, opt_order);
+    dbgs() << "opt_order is of size " << opt_order.size() << '\n';
     for (LoopRange range : opt_order) {
       // Optimizing for a loop
       std::vector<Instruction*> instr_to_move;
@@ -176,7 +195,7 @@ PreservedAnalyses UnitLICM::run(Function& F, FunctionAnalysisManager& FAM) {
 
 
   // Set proper preserved analyses
-  // return PreservedAnalyses::all();
-  PreservedAnalyses PA;
-  return PA;
+  return PreservedAnalyses::all();
+
+  
 }

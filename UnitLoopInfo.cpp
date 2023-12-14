@@ -108,9 +108,9 @@ void SetupInnerLoops(BasicBlock* outer_loop_header, BasicBlock* end, UnitLoopInf
 void printAllSubLoopLeadersReference(Loop* L) {
    // Get the loop header
     BasicBlock *Header = L->getHeader();
+    dbgs() << "parent loop header: " << Header->front() << "\n";
     for (Loop *SubLoop : L->getSubLoops()) {
       BasicBlock *SubLoopHeader = SubLoop->getHeader();
-      dbgs() << "parent loop header: " << Header->front() << "\n";
       dbgs() << "It has child loop header: ^-" << SubLoopHeader->front() << "\n";
       // Recurse
       printAllSubLoopLeadersReference(SubLoop);
@@ -181,9 +181,9 @@ UnitLoopInfo UnitLoopAnalysis::run(Function &F, FunctionAnalysisManager &FAM) {
     //   dbgs() << "[LoopLoopAnalysis] parent loop header is: " << block->front() << "\n";
     //   dbgs() << "[LoopLoopAnalysis] It has child loop header : ^-" << header_block->front() << "\n";
     // }
+    dbgs() << "[LoopLoopAnalysis] parent loop header is: " << header_block->front() << "\n"; 
     for (auto& [back_src, children_loops] : loop_info->m_ChildrenLoopHeader) {
       for (auto& [child_loop_header, child_backedge_src] : children_loops) {
-        dbgs() << "[LoopLoopAnalysis] parent loop header is: " << header_block->front() << "\n"; 
         dbgs() << "[LoopLoopAnalysis] It has child loop header : ^-" << child_loop_header->front() << "\n";
       }
     }
@@ -196,6 +196,7 @@ UnitLoopInfo UnitLoopAnalysis::run(Function &F, FunctionAnalysisManager &FAM) {
   for (Loop *L : LI) {
     // Get the loop header
     BasicBlock *Header = L->getHeader();
+    // dbgs() << "Reference: " << Header->front() << "\n";
     printAllSubLoopLeadersReference(L);
   }
   dbgs() << "******************************************************\n";
