@@ -23,6 +23,9 @@ public:
 
   // Innermost loop header (if there is one) for basic blocks if it is a member of some natural loops
   std::unordered_map<BasicBlock*, BasicBlock*> m_InnerMostLoopHeader;
+
+  // Vectors of Outermost loops
+  std::vector<BasicBlock*> m_OuterMostLoopHeaders;
 };
 
 // An object holding the metadata of a natural loop, only attached to loop headers
@@ -34,6 +37,10 @@ struct LoopMeta {
 
   // The outer layer loop header, identified by sources of back edges
   std::unordered_map<BasicBlock*, BasicBlock*> m_ParentLoopHeader;
+
+  // The children (nested) loop headers inside this loop
+  // back src -> vector of <child loop header, child loop back src>
+  std::unordered_map<BasicBlock*, std::vector<std::pair<BasicBlock*, BasicBlock*>>> m_ChildrenLoopHeader; 
 
   // Loop members identified by different back edge source blocks
   std::unordered_map<BasicBlock*, std::vector<BasicBlock*>> m_LoopMemberBlocks;

@@ -96,6 +96,9 @@ void SetupInnerLoops(BasicBlock* outer_loop_header, BasicBlock* end, UnitLoopInf
         // dbgs() << (member_set==member_loop_members_set && member_loop_members_set==member_set) << "\n";
         if (SetAContainsSetB(member_set, member_loop_members_set)) {
           member_loop_header_meta->m_ParentLoopHeader[member_back_src] = outer_loop_header;
+          Loops.m_HeaderLoopMeta[outer_loop_header]->m_ChildrenLoopHeader[end].push_back(
+            std::make_pair(member_loop_header_meta->m_LoopHeader, member_back_src)
+          );
         }
       }
     }
@@ -155,9 +158,19 @@ UnitLoopInfo UnitLoopAnalysis::run(Function &F, FunctionAnalysisManager &FAM) {
 
   
   for (auto& [header_block, loop_info] : Loops.m_HeaderLoopMeta) {
-    for (auto& [back_src, block] : loop_info->m_ParentLoopHeader) {
-      dbgs() << "[LoopLoopAnalysis] parent loop header is: " << block->front() << "\n";
-      dbgs() << "[LoopLoopAnalysis] It has child loop header : ^-" << header_block->front() << "\n";
+    // If has not parent loop header, then it is one of the outermost loops
+    if (loop_info->m_ParentLoopHeader.size() == 0) {
+      Loops.m_OuterMostLoopHeaders.push_back(header_block);
+    }
+    // for (auto& [back_src, block] : loop_info->m_ParentLoopHeader) {
+    //   dbgs() << "[LoopLoopAnalysis] parent loop header is: " << block->front() << "\n";
+    //   dbgs() << "[LoopLoopAnalysis] It has child loop header : ^-" << header_block->front() << "\n";
+    // }
+    for (auto& [back_src, children_loops] : loop_info->m_ChildrenLoopHeader) {
+      for (auto& [child_loop_header, child_backedge_src] : children_loops) {
+        dbgs() << "[LoopLoopAnalysis] parent loop header is: " << header_block->front() << "\n"; 
+        dbgs() << "[LoopLoopAnalysis] It has child loop header : ^-" << child_loop_header->front() << "\n";
+      }
     }
   }
 
