@@ -3,10 +3,10 @@
         {
             "name": "Linux",
             "includePath": [
-                "${default}",
-                "/usr/lib/llvm-15/include"
+                "/usr/include/llvm-15/",
+                "${workspaceFolder}/**"
             ],
-            "defines": []
+            "cppStandard": "c++17"
         }
     ],
     "version": 4

@@ -11,13 +11,17 @@ namespace cs426 {
 /// additional information you find useful for your LICM pass
 class UnitLoopInfo {
   // Define this class to provide the information you need in LICM
-  std::vector<BasicBlock*> Entries;
-  std::vector<BasicBlock*> Exits;
-  std::vector<BasicBlock*> Blocks;
+  public:
+    DenseMap<BasicBlock*, DenseSet<BasicBlock*>> header_to_body;
+    DenseMap<BasicBlock*, DenseSet<BasicBlock*>> header_to_latch;
+    DenseMap<BasicBlock*, DenseSet<BasicBlock*>> header_to_exiting;
+    DenseMap<BasicBlock*, DenseSet<BasicBlock*>> forest;
 };
 
+
+
 /// Loop Identification Analysis Pass. Produces a UnitLoopInfo object which
-/// should contain any information about the loops in the function which is
+/// should contain any information about the loops in the function whic h is
 /// needed for your implementation of LICM
 class UnitLoopAnalysis : public AnalysisInfoMixin<UnitLoopAnalysis> {
   friend AnalysisInfoMixin<UnitLoopAnalysis>;
@@ -28,5 +32,7 @@ public:
 
   UnitLoopInfo run(Function &F, FunctionAnalysisManager &AM);
 };
+
 } // namespace
+
 #endif // INCLUDE_UNIT_LOOP_INFO_H
