@@ -23,21 +23,12 @@ STATISTIC(Total, "Total number of computes hoisted");
 void InnerToOuterLoops(UnitLoopInfo& Loops, BasicBlock* loop_header, std::vector<LoopRange>& result) {
   LoopMeta* loop_info = Loops.m_HeaderLoopMeta[loop_header];
   
-  // dbgs() << loop_info->m_ChildrenLoopHeader.size() << '\n';
-
   for (auto& [back_src, members] : loop_info->m_LoopMemberBlocks) {
     for (auto& child_ranges : loop_info->m_ChildrenLoopHeader[back_src]) {
       InnerToOuterLoops(Loops, child_ranges.first, result);
     }
     result.push_back({loop_header, back_src});
   }
-  // for (auto& [back_edge_src, child_ranges] : loop_info->m_ChildrenLoopHeader) {
-  //   for (auto& [child_head, child_end] : child_ranges) {
-  //     // result.push_back({child_head, child_end});
-  //     InnerToOuterLoops(Loops, child_head, result);
-  //   }
-  //   result.push_back({loop_header, back_edge_src});
-  // }
 }
 
 bool ShouldConsiderInstr(Instruction& I) {
@@ -108,7 +99,6 @@ PreservedAnalyses UnitLICM::run(Function& F, FunctionAnalysisManager& FAM) {
     } else {
       BasicBlock* preheader = BasicBlock::Create(loop_header->getContext(), "", loop_header->getParent(), loop_header);
       for (BasicBlock* pred : original_enter_nodes) {
-        dbgs() << "after create the entry point: " << *pred->getTerminator() << '\n';
         Instruction* last_instr = pred->getTerminator();
         last_instr->replaceSuccessorWith(loop_header, preheader);
         loop_header->replacePhiUsesWith(pred, preheader);
@@ -121,12 +111,9 @@ PreservedAnalyses UnitLICM::run(Function& F, FunctionAnalysisManager& FAM) {
 
 
   for (BasicBlock* outermost_loop_header : Loops.m_OuterMostLoopHeaders) {
-      dbgs() << "in for outermost_loop_header\n";
     std::vector<LoopRange> opt_order;
     InnerToOuterLoops(Loops, outermost_loop_header, opt_order);
-    dbgs() << "opt_order is of size " << opt_order.size() << '\n';
     for (LoopRange range : opt_order) {
-      dbgs() << "in for opt_order\n";
       // Optimizing for a loop
       std::vector<Instruction*> instr_to_move;
       std::unordered_set<Instruction*> invariant_instrs;
@@ -206,9 +193,7 @@ PreservedAnalyses UnitLICM::run(Function& F, FunctionAnalysisManager& FAM) {
 
 
   // Set proper preserved analyses
-  // PreservedAnalyses PA = PreservedAnalyses::all();
-  // PA.abandon<UnitLoopAnalysis>();
-  // return PreservedAnalyses::all();
+  // Since the CFG is now changed, need to rerun the analysis passes again
   PreservedAnalyses PA;
   return PA;
 
