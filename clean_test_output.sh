@@ -1,2 +1,2 @@
 cd tests
-rm *.ll *.o
+rm *.ll
