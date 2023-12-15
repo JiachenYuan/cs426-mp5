@@ -55,11 +55,11 @@ bool AliasExistsInLoop(AAResults& AA, Instruction& target, UnitLoopInfo& Loops, 
       if ((isa<StoreInst>(I) || isa<LoadInst>(I)) && (&target != &I)) {
         if (StoreInst* target_casted = dyn_cast<StoreInst>(&target)) {
           if (StoreInst* I_casted = dyn_cast<StoreInst>(&I)) {
-            if (AA.alias(target_casted->getPointerOperand(), I_casted->getPointerOperand())) {
+            if (AA.alias(target_casted->getPointerOperand(), I_casted->getPointerOperand()) != AliasResult::NoAlias) {
               return true;
             }
           } else if (LoadInst* I_casted = dyn_cast<LoadInst>(&I)) {
-            if (AA.alias(target_casted->getPointerOperand(), I_casted->getPointerOperand())) {
+            if (AA.alias(target_casted->getPointerOperand(), I_casted->getPointerOperand()) != AliasResult::NoAlias) {
               return true;
             }
           }
@@ -96,16 +96,18 @@ PreservedAnalyses UnitLICM::run(Function& F, FunctionAnalysisManager& FAM) {
   std::unordered_map<BasicBlock*, BasicBlock*> LoopPreHeaders;
   for (auto& [loop_header, loop_info] : Loops.m_HeaderLoopMeta) {
     // BB creation alters the entry point of the predecessor list of the original loop header, need to precomputed
-    std::vector<BasicBlock*> original_predecessors;
+    std::vector<BasicBlock*> original_enter_nodes;
     for (auto pred : predecessors(loop_header)) {
       // dbgs() << "original predecessor: " << *pred->getTerminator() << '\n';
-      original_predecessors.push_back(pred);
+      if (!DT.dominates(loop_header, pred)) {
+        original_enter_nodes.push_back(pred);
+      }
     }
-    if (original_predecessors.size() == 1) {
-      LoopPreHeaders[loop_header] = original_predecessors[0];
+    if (original_enter_nodes.size() == 1) {
+      LoopPreHeaders[loop_header] = original_enter_nodes[0];
     } else {
-      BasicBlock* preheader = BasicBlock::Create(loop_header->getContext(), "pre_header", loop_header->getParent(), loop_header);
-      for (BasicBlock* pred : original_predecessors) {
+      BasicBlock* preheader = BasicBlock::Create(loop_header->getContext(), "", loop_header->getParent(), loop_header);
+      for (BasicBlock* pred : original_enter_nodes) {
         dbgs() << "after create the entry point: " << *pred->getTerminator() << '\n';
         Instruction* last_instr = pred->getTerminator();
         last_instr->replaceSuccessorWith(loop_header, preheader);
@@ -141,7 +143,8 @@ PreservedAnalyses UnitLICM::run(Function& F, FunctionAnalysisManager& FAM) {
             if (AliasExistsInLoop(AA, I, Loops, range.loop_header, range.back_edge_src)) {
               is_invariant = false;
             }
-          } else {
+          }
+          // } else {
             // A hoist candidate must dominates all exit blocks
             for (BasicBlock* exit_block : Loops.m_HeaderLoopMeta[range.loop_header]->m_LoopExitBlocks[range.back_edge_src]) {
               if (!DT.dominates(BB, exit_block)) {
@@ -150,8 +153,8 @@ PreservedAnalyses UnitLICM::run(Function& F, FunctionAnalysisManager& FAM) {
               }
             }
             // Even if not dominating all exits, speculative hoist non-excepting instructions
-            if (!isSafeToSpeculativelyExecute(&I)) {
-              is_invariant = false;
+            if (!is_invariant && isSafeToSpeculativelyExecute(&I)) {
+              is_invariant = true;
             }
             // If invariant candidate so far, check whether data dependency outside the loop
             if (is_invariant) {
@@ -172,7 +175,7 @@ PreservedAnalyses UnitLICM::run(Function& F, FunctionAnalysisManager& FAM) {
                 }
               }
             }
-          }
+          
           // Instruction reaching this point should be invariant
           if (is_invariant) {
             invariant_instrs.insert(&I);
@@ -182,6 +185,8 @@ PreservedAnalyses UnitLICM::run(Function& F, FunctionAnalysisManager& FAM) {
       }
       // Hoist the instructions
       for (Instruction* instr : instr_to_move) {
+        dbgs() << "Instruction to be moved: " << *instr << '\n';
+        BasicBlock* BB =LoopPreHeaders[range.loop_header];
         Instruction* insert_point = LoopPreHeaders[range.loop_header]->getTerminator();
         instr->moveBefore(insert_point);
       }
@@ -203,9 +208,9 @@ PreservedAnalyses UnitLICM::run(Function& F, FunctionAnalysisManager& FAM) {
   // Set proper preserved analyses
   // PreservedAnalyses PA = PreservedAnalyses::all();
   // PA.abandon<UnitLoopAnalysis>();
-  return PreservedAnalyses::all();
-  // PreservedAnalyses PA;
-  // return PA;
+  // return PreservedAnalyses::all();
+  PreservedAnalyses PA;
+  return PA;
 
   
 }
