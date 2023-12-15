@@ -105,17 +105,6 @@ void SetupInnerLoops(BasicBlock* outer_loop_header, BasicBlock* end, UnitLoopInf
   }
 }
 
-void printAllSubLoopLeadersReference(Loop* L) {
-   // Get the loop header
-    BasicBlock *Header = L->getHeader();
-    dbgs() << "parent loop header: " << Header->front() << "\n";
-    for (Loop *SubLoop : L->getSubLoops()) {
-      BasicBlock *SubLoopHeader = SubLoop->getHeader();
-      dbgs() << "It has child loop header: ^-" << SubLoopHeader->front() << "\n";
-      // Recurse
-      printAllSubLoopLeadersReference(SubLoop);
-    }
-}
 
 /// Main function for running the Loop Identification analysis. This function
 /// returns information about the loops in the function via the UnitLoopInfo
@@ -177,10 +166,7 @@ UnitLoopInfo UnitLoopAnalysis::run(Function &F, FunctionAnalysisManager &FAM) {
     if (loop_info->m_ParentLoopHeader.size() == 0) {
       Loops.m_OuterMostLoopHeaders.push_back(header_block);
     }
-    // for (auto& [back_src, block] : loop_info->m_ParentLoopHeader) {
-    //   dbgs() << "[LoopLoopAnalysis] parent loop header is: " << block->front() << "\n";
-    //   dbgs() << "[LoopLoopAnalysis] It has child loop header : ^-" << header_block->front() << "\n";
-    // }
+
     dbgs() << "[LoopLoopAnalysis] parent loop header is: " << header_block->front() << "\n"; 
     for (auto& [back_src, children_loops] : loop_info->m_ChildrenLoopHeader) {
       for (auto& [child_loop_header, child_backedge_src] : children_loops) {
@@ -189,17 +175,6 @@ UnitLoopInfo UnitLoopAnalysis::run(Function &F, FunctionAnalysisManager &FAM) {
     }
   }
 
-  
-  // Run built-in analysis pass and print out debug info
-  LoopInfo &LI = FAM.getResult<LoopAnalysis>(F);
-  dbgs() << "\n *** Built-in LoopInfo analysis *** \n";
-  for (Loop *L : LI) {
-    // Get the loop header
-    BasicBlock *Header = L->getHeader();
-    // dbgs() << "Reference: " << Header->front() << "\n";
-    printAllSubLoopLeadersReference(L);
-  }
-  dbgs() << "******************************************************\n";
 
 
 
